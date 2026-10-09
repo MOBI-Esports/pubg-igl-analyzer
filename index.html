@@ -1,0 +1,530 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQUAD INTELLIGENCE | PUBG IGL Analyzer</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root {
+  --bg:#080a0e; --panel:#11151c; --panel2:#171d26;
+  --gold:#e0b65b; --text:#f4f5f7; --muted:#929baa;
+  --line:#29303b; --green:#65e6a1; --red:#ff7474;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}
+header{padding:22px 5%;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:#0b0e13}
+.brand{font-size:19px;font-weight:900;letter-spacing:1.5px}
+.brand span{color:var(--gold)}
+.tagline{color:var(--muted);font-size:12px;margin-top:5px}
+button,.button{background:var(--gold);color:#101116;border:0;padding:11px 15px;border-radius:7px;font-weight:800;cursor:pointer}
+button.secondary{background:#242b36;color:white;border:1px solid #3a4350}
+button.danger{background:#3b2025;color:#ffaaaa}
+button:disabled{opacity:.5;cursor:not-allowed}
+main{max-width:1200px;margin:auto;padding:28px 5% 60px}
+.eyebrow{color:var(--gold);font-size:11px;letter-spacing:2px;font-weight:800}
+h1{font-size:clamp(27px,4vw,43px);margin:9px 0}
+h2{font-size:17px;margin:0 0 16px}
+p{color:var(--muted);line-height:1.6}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:24px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:20px;min-width:0}
+.wide{grid-column:1/-1}
+label{display:block;color:#c1c7d1;font-size:12px;margin:14px 0 7px}
+input,select,textarea{width:100%;background:#090c11;color:white;border:1px solid #333c49;border-radius:7px;padding:12px;font:inherit}
+input[type=file]{padding:10px}
+textarea{min-height:150px;resize:vertical;line-height:1.5}
+.row{display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.status{font-size:13px;color:var(--muted);margin-top:12px;white-space:pre-wrap;overflow-wrap:anywhere}
+.status.good{color:var(--green)}.status.bad{color:var(--red)}
+.statgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}
+.stat{background:var(--panel2);border-radius:9px;padding:14px}
+.stat small{color:var(--muted);display:block;font-size:11px}
+.stat strong{display:block;font-size:23px;margin-top:7px;color:var(--gold)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:12px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600}
+.pill{display:inline-block;padding:5px 9px;background:#29271f;color:var(--gold);border-radius:20px;font-size:11px}
+.hidden{display:none!important}
+footer{border-top:1px solid var(--line);padding:20px 5%;text-align:center;color:var(--muted);font-size:12px}
+.note{border-left:3px solid var(--gold);padding:10px 13px;background:#18170f;color:#d9d0ba;font-size:13px;line-height:1.6}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.wide{grid-column:auto}.statgrid{grid-template-columns:repeat(3,minmax(0,1fr))}.card{padding:15px}.stat{padding:10px}.stat strong{font-size:19px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="brand">SQUAD <span>INTELLIGENCE</span></div>
+    <div class="tagline">PUBG MOBILE · COMPETITIVE TEAM ANALYTICS</div>
+  </div>
+  <div class="row" style="flex:0 0 auto">
+    <span id="accountLabel" class="tagline">NOT SIGNED IN</span>
+    <button id="logoutBtn" class="secondary hidden" onclick="logout()">Log out</button>
+  </div>
+</header>
+
+<main>
+  <div class="eyebrow">COMMAND CENTER / TEAM PERFORMANCE</div>
+  <h1>Make every match count.</h1>
+  <p>Manage your squad, upload match screenshots, extract text, and build a clearer picture of team performance.</p>
+
+  <div class="note">
+    <strong>Build status:</strong> Account, roster, screenshot storage and OCR are included. Automatic recognition of PUBG-specific stats and advanced player ratings are not implemented yet. OCR results must be checked before we use them for analysis.
+  </div>
+
+  <section id="authSection" class="grid">
+    <div class="card">
+      <h2>Welcome back</h2>
+      <label for="email">Email address</label>
+      <input id="email" type="email" autocomplete="email" placeholder="you@example.com">
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Your password">
+      <div class="actions">
+        <button onclick="login()">Log in</button>
+        <button class="secondary" onclick="signup()">Create account</button>
+      </div>
+      <div id="authStatus" class="status" aria-live="polite"></div>
+    </div>
+    <div class="card">
+      <h2>Your competitive workspace</h2>
+      <div class="statgrid">
+        <div class="stat"><small>GAME MODE</small><strong>BR</strong></div>
+        <div class="stat"><small>ROSTER</small><strong>4+</strong></div>
+        <div class="stat"><small>OCR</small><strong>ON</strong></div>
+      </div>
+      <p>Use your account to access your own teams and saved match records from different devices.</p>
+      <p>New accounts may require email confirmation, depending on your Supabase authentication settings.</p>
+    </div>
+  </section>
+
+  <section id="appSection" class="hidden">
+    <div class="grid">
+      <div class="card">
+        <h2>01 / Create your team</h2>
+        <label for="teamName">Team name</label>
+        <input id="teamName" maxlength="60" placeholder="Enter your squad name">
+        <div class="actions"><button onclick="createTeam()">Create team</button></div>
+        <div id="teamStatus" class="status" aria-live="polite"></div>
+      </div>
+
+      <div class="card">
+        <h2>02 / Select active team</h2>
+        <label for="teamSelect">Your teams</label>
+        <select id="teamSelect" onchange="selectTeam()">
+          <option value="">No team selected</option>
+        </select>
+        <p>Choose a team before adding players or saving a match.</p>
+        <div id="selectedTeamStatus" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>03 / Add a player</h2>
+        <label for="playerName">PUBG name</label>
+        <input id="playerName" maxlength="60" placeholder="Player in-game name">
+        <label for="playerRole">Squad role</label>
+        <select id="playerRole">
+          <option>IGL</option>
+          <option>Assaulter</option>
+          <option>Support</option>
+          <option>Scout</option>
+        </select>
+        <div class="actions"><button onclick="addPlayer()">Add player</button></div>
+        <div id="playerStatus" class="status" aria-live="polite"></div>
+      </div>
+
+      <div class="card">
+        <h2>04 / Squad roster</h2>
+        <div id="roster"><p>Select a team to view its players.</p></div>
+        <div id="rosterStatus" class="status"></div>
+      </div>
+
+      <div class="card wide">
+        <h2>05 / Import match screenshot</h2>
+        <p>Upload a clear PUBG Mobile results screenshot. OCR runs in your browser; then the image and extracted text are saved to your private Supabase storage and match record.</p>
+        <div class="row">
+          <div>
+            <label for="matchDate">Match date</label>
+            <input id="matchDate" type="date">
+          </div>
+          <div>
+            <label for="mapName">Map</label>
+            <select id="mapName">
+              <option>Erangel</option><option>Miramar</option><option>Sanhok</option>
+              <option>Vikendi</option><option>Livik</option><option>Rondo</option>
+              <option>Other / Unknown</option>
+            </select>
+          </div>
+          <div>
+            <label for="placement">Team placement (optional)</label>
+            <input id="placement" type="number" min="1" max="100" placeholder="e.g. 1">
+          </div>
+        </div>
+        <label for="screenshot">Results screenshot</label>
+        <input id="screenshot" type="file" accept="image/png,image/jpeg,image/webp">
+        <div class="actions">
+          <button id="processBtn" onclick="processScreenshot()">Upload &amp; extract text</button>
+        </div>
+        <div id="ocrStatus" class="status" aria-live="polite"></div>
+        <label for="ocrOutput">Extracted text (review and correct this)</label>
+        <textarea id="ocrOutput" placeholder="Extracted screenshot text will appear here..."></textarea>
+        <div class="actions">
+          <button class="secondary" onclick="saveCorrectedText()">Save corrected text</button>
+          <button class="secondary" onclick="clearOCR()">Clear</button>
+        </div>
+        <p class="tagline">This version stores the OCR text, not verified player statistics. Avoid uploading screenshots containing personal information you don't want stored.</p>
+      </div>
+
+      <div class="card wide">
+        <h2>06 / Performance analytics</h2>
+        <div class="statgrid">
+          <div class="stat"><small>SAVED MATCHES</small><strong id="matchCount">0</strong></div>
+          <div class="stat"><small>ROSTER SIZE</small><strong id="playerCount">0</strong></div>
+          <div class="stat"><small>VERIFIED PLAYER STATS</small><strong>—</strong></div>
+        </div>
+        <p id="analyticsMessage">Once we implement the screenshot parser and verified stat records, this section can calculate averages, consistency, combat impact, survival, support contribution and role-based performance.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>SQUAD INTELLIGENCE · PUBG MOBILE TEAM ANALYTICS</footer>
+
+<script>
+const SUPABASE_URL = "https://cptmpvllambmmumwaqkt.supabase.co";
+const SUPABASE_KEY = "PASTE_YOUR_PUBLISHABLE_KEY_HERE";
+const BUCKET = "match-screenshots";
+
+let db = null;
+let currentUser = null;
+let activeTeam = null;
+let teams = [];
+let roster = [];
+let latestMatchId = null;
+let latestScreenshotPath = null;
+
+const $ = id => document.getElementById(id);
+
+function status(id, message, good = false) {
+  const el = $(id);
+  el.textContent = message;
+  el.className = "status" + (good ? " good" : " bad");
+}
+
+function init() {
+  $("matchDate").value = new Date().toISOString().slice(0, 10);
+
+  if (SUPABASE_KEY === "PASTE_YOUR_PUBLISHABLE_KEY_HERE") {
+    status("authStatus", "Setup needed: add your Supabase publishable key in the code before logging in.");
+    return;
+  }
+
+  db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  db.auth.getSession().then(({ data, error }) => {
+    if (error) return status("authStatus", error.message);
+    if (data.session) applySession(data.session);
+  });
+
+  db.auth.onAuthStateChange((_event, session) => {
+    if (session) {
+      applySession(session);
+    } else {
+      currentUser = null;
+      activeTeam = null;
+      $("appSection").classList.add("hidden");
+      $("authSection").classList.remove("hidden");
+      $("logoutBtn").classList.add("hidden");
+      $("accountLabel").textContent = "NOT SIGNED IN";
+    }
+  });
+}
+
+async function applySession(session) {
+  currentUser = session.user;
+  $("authSection").classList.add("hidden");
+  $("appSection").classList.remove("hidden");
+  $("logoutBtn").classList.remove("hidden");
+  $("accountLabel").textContent = currentUser.email || "SIGNED IN";
+  await loadTeams();
+}
+
+async function signup() {
+  if (!db) return status("authStatus", "Add your Supabase publishable key in the code first.");
+  const email = $("email").value.trim();
+  const password = $("password").value;
+  if (!email || password.length < 6) {
+    return status("authStatus", "Enter an email and a password of at least 6 characters.");
+  }
+  status("authStatus", "Creating account...", true);
+  const { data, error } = await db.auth.signUp({ email, password });
+  if (error) return status("authStatus", error.message);
+  if (data.session) {
+    await applySession(data.session);
+    status("authStatus", "Account created.", true);
+  } else {
+    status("authStatus", "Account created. Check your email to confirm it, then log in.", true);
+  }
+}
+
+async function login() {
+  if (!db) return status("authStatus", "Add your Supabase publishable key in the code first.");
+  const email = $("email").value.trim();
+  const password = $("password").value;
+  if (!email || !password) return status("authStatus", "Enter your email and password.");
+  status("authStatus", "Logging in...", true);
+  const { data, error } = await db.auth.signInWithPassword({ email, password });
+  if (error) return status("authStatus", error.message);
+  await applySession(data.session);
+  status("authStatus", "Logged in successfully.", true);
+}
+
+async function logout() {
+  if (!db) return;
+  const { error } = await db.auth.signOut();
+  if (error) status("authStatus", error.message);
+}
+
+async function createTeam() {
+  if (!currentUser) return status("teamStatus", "Log in first.");
+  const name = $("teamName").value.trim();
+  if (!name) return status("teamStatus", "Enter a team name.");
+  const { data, error } = await db.from("teams")
+    .insert({ name, owner_id: currentUser.id })
+    .select("id,name")
+    .single();
+  if (error) return status("teamStatus", error.message);
+  $("teamName").value = "";
+  status("teamStatus", "Team created successfully.", true);
+  await loadTeams();
+  if (data) {
+    $("teamSelect").value = data.id;
+    await selectTeam();
+  }
+}
+
+async function loadTeams() {
+  if (!currentUser) return;
+  const { data, error } = await db.from("teams")
+    .select("id,name,created_at")
+    .eq("owner_id", currentUser.id)
+    .order("created_at", { ascending: true });
+  if (error) {
+    status("teamStatus", error.message);
+    return;
+  }
+  teams = data || [];
+  const select = $("teamSelect");
+  select.replaceChildren();
+  const first = document.createElement("option");
+  first.value = "";
+  first.textContent = teams.length ? "Choose a team" : "Create your first team";
+  select.appendChild(first);
+  for (const team of teams) {
+    const option = document.createElement("option");
+    option.value = team.id;
+    option.textContent = team.name;
+    select.appendChild(option);
+  }
+  if (activeTeam && teams.some(t => t.id === activeTeam.id)) {
+    select.value = activeTeam.id;
+  } else if (teams.length) {
+    select.value = teams[0].id;
+  }
+  await selectTeam();
+}
+
+async function selectTeam() {
+  const id = $("teamSelect").value;
+  activeTeam = teams.find(t => t.id === id) || null;
+  $("selectedTeamStatus").textContent = activeTeam
+    ? "Active team: " + activeTeam.name
+    : "Create or select a team to continue.";
+  await loadRoster();
+  await loadMatchCount();
+}
+
+async function loadRoster() {
+  const el = $("roster");
+  el.replaceChildren();
+  if (!activeTeam) {
+    el.textContent = "Select a team to view its players.";
+    roster = [];
+    $("playerCount").textContent = "0";
+    return;
+  }
+  const { data, error } = await db.from("players")
+    .select("id,name,role")
+    .eq("team_id", activeTeam.id)
+    .order("created_at", { ascending: true });
+  if (error) {
+    status("rosterStatus", error.message);
+    return;
+  }
+  roster = data || [];
+  $("playerCount").textContent = String(roster.length);
+  if (!roster.length) {
+    el.textContent = "No players yet. Add your first player.";
+    return;
+  }
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  head.innerHTML = "<tr><th>Player</th><th>Role</th><th>Action</th></tr>";
+  table.appendChild(head);
+  const body = document.createElement("tbody");
+  for (const player of roster) {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    name.textContent = player.name;
+    const role = document.createElement("td");
+    const pill = document.createElement("span");
+    pill.className = "pill";
+    pill.textContent = player.role;
+    role.appendChild(pill);
+    const action = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.className = "danger";
+    btn.textContent = "Remove";
+    btn.onclick = () => removePlayer(player.id, player.name);
+    action.appendChild(btn);
+    tr.append(name, role, action);
+    body.appendChild(tr);
+  }
+  table.appendChild(body);
+  el.appendChild(table);
+}
+
+async function addPlayer() {
+  if (!activeTeam) return status("playerStatus", "Create or select a team first.");
+  const name = $("playerName").value.trim();
+  const role = $("playerRole").value;
+  if (!name) return status("playerStatus", "Enter the player's PUBG name.");
+  if (roster.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    return status("playerStatus", "That name is already in this roster.");
+  }
+  const { error } = await db.from("players").insert({
+    team_id: activeTeam.id, name, role
+  });
+  if (error) return status("playerStatus", error.message);
+  $("playerName").value = "";
+  status("playerStatus", "Player added.", true);
+  await loadRoster();
+}
+
+async function removePlayer(id, name) {
+  if (!confirm("Remove " + name + " from this team?")) return;
+  const { error } = await db.from("players").delete().eq("id", id);
+  if (error) return status("rosterStatus", error.message);
+  status("rosterStatus", "Player removed.", true);
+  await loadRoster();
+}
+
+async function loadMatchCount() {
+  if (!currentUser || !activeTeam) {
+    $("matchCount").textContent = "0";
+    return;
+  }
+  const { count, error } = await db.from("matches")
+    .select("id", { count: "exact", head: true })
+    .eq("team_id", activeTeam.id)
+    .eq("owner_id", currentUser.id);
+  if (error) {
+    status("ocrStatus", "Could not load match count: " + error.message);
+    return;
+  }
+  $("matchCount").textContent = String(count || 0);
+}
+
+async function processScreenshot() {
+  if (!currentUser) return status("ocrStatus", "Log in first.");
+  if (!activeTeam) return status("ocrStatus", "Create or select a team first.");
+  const file = $("screenshot").files[0];
+  if (!file) return status("ocrStatus", "Choose a screenshot first.");
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+    return status("ocrStatus", "Choose a JPG, PNG, or WebP image.");
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    return status("ocrStatus", "Please use an image smaller than 10 MB.");
+  }
+
+  const btn = $("processBtn");
+  btn.disabled = true;
+  $("ocrOutput").value = "";
+  latestMatchId = null;
+  latestScreenshotPath = null;
+
+  try {
+    status("ocrStatus", "Step 1 of 3: Extracting text in your browser...", true);
+    const result = await Tesseract.recognize(file, "eng", {
+      logger: m => {
+        if (m.status === "recognizing text") {
+          status("ocrStatus", "Reading screenshot: " + Math.round((m.progress || 0) * 100) + "%", true);
+        }
+      }
+    });
+    const extractedText = (result.data.text || "").trim();
+    $("ocrOutput").value = extractedText;
+    if (!extractedText) throw new Error("No readable text found. Try a clearer screenshot.");
+
+    status("ocrStatus", "Step 2 of 3: Uploading screenshot to private storage...", true);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = currentUser.id + "/" + crypto.randomUUID() + "-" + safeName;
+    const { error: uploadError } = await db.storage.from(BUCKET).upload(path, file, {
+      contentType: file.type, upsert: false
+    });
+    if (uploadError) throw uploadError;
+    latestScreenshotPath = path;
+
+    status("ocrStatus", "Step 3 of 3: Saving match record...", true);
+    const placementText = $("placement").value;
+    const placement = placementText ? Number(placementText) : null;
+    if (placement !== null && (!Number.isInteger(placement) || placement < 1 || placement > 100)) {
+      throw new Error("Placement must be a whole number between 1 and 100.");
+    }
+
+    const { data, error: matchError } = await db.from("matches").insert({
+      team_id: activeTeam.id,
+      owner_id: currentUser.id,
+      match_date: $("matchDate").value || new Date().toISOString().slice(0, 10),
+      map_name: $("mapName").value,
+      placement,
+      screenshot_path: path,
+      ocr_text: extractedText
+    }).select("id").single();
+
+    if (matchError) throw matchError;
+    latestMatchId = data.id;
+    status("ocrStatus", "Screenshot uploaded and OCR text saved. Review the extracted text below; player stats have not yet been automatically parsed.", true);
+    await loadMatchCount();
+  } catch (error) {
+    status("ocrStatus", "Error: " + (error.message || "Something went wrong."));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveCorrectedText() {
+  if (!currentUser) return status("ocrStatus", "Log in first.");
+  if (!latestMatchId) return status("ocrStatus", "Upload a screenshot first so there is a match record to update.");
+  const corrected = $("ocrOutput").value.trim();
+  const { error } = await db.from("matches")
+    .update({ ocr_text: corrected })
+    .eq("id", latestMatchId)
+    .eq("owner_id", currentUser.id);
+  if (error) return status("ocrStatus", "Could not save corrections: " + error.message);
+  status("ocrStatus", "Corrected OCR text saved.", true);
+}
+
+function clearOCR() {
+  $("ocrOutput").value = "";
+  $("screenshot").value = "";
+  latestMatchId = null;
+  latestScreenshotPath = null;
+  status("ocrStatus", "Text area cleared. Previously saved matches are unchanged.", true);
+}
+
+init();
+</script>
+</body>
+</html>
